@@ -39,8 +39,10 @@ class Pool:
 
     _pool = None
     _server = None
+    _timeout = None
+    _autorefresh = None
 
-    def __init__(self, pool=None, server=DEFAULT_SERVER):
+    def __init__(self, pool, server=DEFAULT_SERVER):
         self._server = server
         self._pool = pool
 
@@ -48,15 +50,31 @@ class Pool:
         return self
 
     def next(self):
+        params = {}
+        if (self._timeout > 0):
+            params['timeout'] = self._timeout
         r = requests.get("{}/pools/{}/nextToken"
-            .format(self._server, self._pool))
+            .format(self._server, self._pool),
+            params={'timeout': self._timeout})
         if r.status_code == 404:
             raise StopIteration
-        token_id = str(r.url.split('/')[-1])
-        return {"token_id": token_id, "data": r.content}
+        orig_headers = r.history[0].headers
+        token = {}
+        token["id"] = str(r.url.split('/')[-1])
+        token["data"] = r.content
+        if (self._timeout > 0):
+            token["lock"] = orig_headers["x-topos-lockurl"]
+        return token
 
     def remove(self, token):
         r = requests.delete("{}/pools/{}/tokens/{}"
-            .format(self._server, self._pool, token['token_id']))
+            .format(self._server, self._pool, token['id']))
         if r.status_code == 404:
             raise KeyError
+
+    def set(self, timeout=0, autorefresh=False):
+        self._timeout = timeout
+        self._autorefresh = autorefresh
+
+    def unlock(self, token):
+        r = requests.delete(token['lock'])

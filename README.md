@@ -17,16 +17,17 @@ Process all available tokens in a pool:
 
 Tokens are provided as a Python dictionary with the following fields:
 
-    { 'token_id': '<>',
+    {
+      'id': '<>',
       'data': '<>',
-      'content-type': '<>',
-      'filename': '<>' }
+      'lock': '<>',
+    }
 
 Token locking (for exclusive tokens) and lock refreshing are handled
 automatically by the library if you ask for it:
 
     >>> pool = topos['12345']
-    >>> pool.set(lock_time=3600, lock_refresh=True)
+    >>> pool.set(timeout=3600, autorefresh=True)
 
 The lock will be removed when the token is deleted or after calling
 `pool.unlock(token)`.
