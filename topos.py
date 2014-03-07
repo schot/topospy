@@ -12,21 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""pythonic ToPoS library"""
+
 import requests
 
 DEFAULT_SERVER = 'https://topos.grid.sara.nl/4.1'
 
 class Server:
-
+    """Represents a ToPoS server instance. Only used to create Pool objects."""
     _server = None
 
     def __init__(self, server=DEFAULT_SERVER):
         self._server = server
 
     def __getitem__(self, pool):
+        """Return a Pool object with the given pool name."""
         return Pool(pool=pool, server=self._server)
 
     def new_pool(self):
+        """Request a new pool from the server."""
         r = requests.get("{}/newPool".format(self._server))
         print r.status_code
         if r.status_code != 200:
@@ -50,6 +54,7 @@ class Pool:
         return self
 
     def next(self):
+        """Fetch a new token."""
         params = {}
         if (self._timeout > 0):
             params['timeout'] = self._timeout
@@ -67,14 +72,24 @@ class Pool:
         return token
 
     def remove(self, token):
+        """Remove token from the pool."""
         r = requests.delete("{}/pools/{}/tokens/{}"
             .format(self._server, self._pool, token['id']))
         if r.status_code == 404:
             raise KeyError
 
     def set(self, timeout=0, autorefresh=False):
+        """Set optional properties of this pool.
+
+        Keyword arguments:
+        timeout -- time in seconds after which token locks will expire
+        autorefresh -- if True locks will be refreshed until the
+                       corresponding token is deleted or unlocked
+                       (not yet implemented)
+        """
         self._timeout = timeout
         self._autorefresh = autorefresh
 
     def unlock(self, token):
+        """Unlock token, allowing others to process it."""
         r = requests.delete(token['lock'])
