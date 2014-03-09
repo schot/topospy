@@ -15,6 +15,8 @@
 """pythonic ToPoS library"""
 
 import requests
+import socket
+from threading import Event, Thread
 
 DEFAULT_SERVER = 'https://topos.grid.sara.nl/4.1'
 
@@ -30,9 +32,9 @@ class Server:
 
     def new_pool(self):
         """Request a new pool from the server."""
-        r = requests.get("{}/newPool".format(self.server))
+        r = requests.get('{}/newPool'.format(self.server))
         if r.status_code != 200:
-            raise RuntimeError("error getting new pool")
+            raise RuntimeError('error getting new pool')
         pool = r.url.split('/')[-2]
         return self[pool]
 
@@ -42,33 +44,41 @@ class Pool:
     def __init__(self, pool, server=DEFAULT_SERVER):
         self.server = server
         self.pool = pool
-        timeout = 0
-        autorefresh = False
+        self.timeout = 0
+        self.autorefresh = False
+        self.refresher = None
 
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         """Fetch a new token."""
         params = {}
-        if (self.timeout > 0):
+        if self.timeout > 0:
             params['timeout'] = self.timeout
-        r = requests.get("{}/pools/{}/nextToken"
-            .format(self.server, self.pool),
-            params={'timeout': self.timeout})
+            params['description'] = socket.gethostname()
+        r = requests.get('{}/pools/{}/nextToken'
+            .format(self.server, self.pool), params=params)
         if r.status_code == 404:
             raise StopIteration
         orig_headers = r.history[0].headers
         token = {}
-        token["id"] = r.url.split('/')[-1]
-        token["data"] = r.content
-        if (self.timeout > 0):
-            token["lock"] = orig_headers["x-topos-lockurl"]
+        token['id'] = r.url.split('/')[-1]
+        token['data'] = r.text
+        if self.timeout > 0:
+            token['lock'] = orig_headers['x-topos-lockurl']
+        if 'lock' in token and self.autorefresh:
+            self.refresher.add(token['lock'], self.timeout)
         return token
+
+    def next(self):
+        return self.__next__()
 
     def remove(self, token):
         """Remove token from the pool."""
-        r = requests.delete("{}/pools/{}/tokens/{}"
+        if 'lock' in token and self.autorefresh:
+            self.refresher.remove(token['lock'])
+        r = requests.delete('{}/pools/{}/tokens/{}'
             .format(self.server, self.pool, token['id']))
         if r.status_code == 404:
             raise KeyError
@@ -77,14 +87,45 @@ class Pool:
         """Set optional properties of this pool.
 
         Keyword arguments:
-        timeout -- time in seconds after which token locks will expire
-        autorefresh -- if True locks will be refreshed until the
-                       corresponding token is deleted or unlocked
-                       (not yet implemented)
+         * timeout -- time in seconds after which token locks will expire
+         * autorefresh -- if True locks will be refreshed until the
+                          corresponding token is deleted or unlocked
         """
         self.timeout = timeout
         self.autorefresh = autorefresh
+        if autorefresh:
+            self.refresher = Refresher()
 
     def unlock(self, token):
         """Unlock token, allowing others to process it."""
-        r = requests.delete(token['lock'])
+        if 'lock' in token and self.autorefresh:
+            self.refresher.remove(token['lock'])
+        requests.delete(token['lock'])
+
+
+class Refresher:
+    """Continuously refreshes locks until unlocked or deleted."""
+
+    def __init__(self):
+        self.locks = {}
+
+    def add(self, lock, timeout):
+        """Add the lock to the set of locks that are autorefreshed."""
+        event = Event()
+        self.locks[lock] = event
+        t = Thread(target=refresh_lock, args=(event, lock, timeout))
+        t.setDaemon(True)
+        t.start()
+
+    def remove(self, lock):
+        """Stop refreshing the given lock."""
+        if lock in self.locks:
+            self.locks[lock].set()
+            del self.locks[lock]
+
+
+def refresh_lock(stop, lock, timeout):
+    """Keep refreshing the lock until the stop event received."""
+    waittime = max(5.0, timeout/2.0 - 10.0)
+    while not stop.wait(waittime):
+        requests.get(lock, params={'timeout': timeout})

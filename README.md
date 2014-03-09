@@ -37,7 +37,7 @@ See `pydoc topos` for the full documentation.
 Installation
 ------------
 
-topos.py requires Python 2.6 or later and the [Requests][1] module.
+topos.py requires Python 2.7 or later and the [Requests][1] module.
 
 [1]: http://docs.python-requests.org
 
