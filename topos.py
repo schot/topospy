@@ -81,6 +81,13 @@ class Pool:
         if r.status_code == 404:
             raise KeyError
 
+    def add(self, token_value):
+        """Upload a token to the pool."""
+        headers = {}
+        headers['content-type'] = 'text/plain'
+        r = requests.put('{}/pools/{}/nextToken'.format(self.root, self.name),
+            data=str(token_value), headers=headers)
+
     def next(self):
         """Fetch a new token."""
         return self.__next__()
