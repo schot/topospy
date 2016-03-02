@@ -8,12 +8,12 @@ Usage
 
 Process all available tokens in a pool:
 
->>> from topos import Server
->>> topos = Server()
+>>> import topos
+>>> topos = topos.Server()
 >>> pool  = topos['12345']
 >>> for token in pool:
 >>>     # do work
->>>     pool.remove(token)
+>>>     del pool[token]
 
 Tokens are provided as a Python dictionary with the following fields::
 

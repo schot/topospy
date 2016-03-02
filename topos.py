@@ -72,10 +72,7 @@ class Pool:
             self.refresher.add(token['lock'], self.timeout)
         return token
 
-    def next(self):
-        return self.__next__()
-
-    def remove(self, token):
+    def __delitem__(self, token):
         """Remove token from the pool."""
         if 'lock' in token and self.autorefresh:
             self.refresher.remove(token['lock'])
@@ -83,6 +80,14 @@ class Pool:
             .format(self.root, self.name, token['id']))
         if r.status_code == 404:
             raise KeyError
+
+    def next(self):
+        """Fetch a new token."""
+        return self.__next__()
+
+    def remove(self, token):
+        """Remove token from the pool."""
+        self.__delitem__(token)
 
     def set(self, timeout=0, autorefresh=False):
         """Set optional properties of this pool.
