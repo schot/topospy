@@ -18,21 +18,21 @@ import requests
 import socket
 from threading import Event, Thread
 
-DEFAULT_SERVER = 'https://topos.grid.sara.nl/4.1'
+DEFAULT_ROOT = 'https://topos.grid.sara.nl/4.1'
 
 class Server:
     """Represents a ToPoS server instance. Only used to create Pool objects."""
 
-    def __init__(self, server=DEFAULT_SERVER):
-        self.server = server
+    def __init__(self, root=DEFAULT_ROOT):
+        self.root = root
 
     def __getitem__(self, pool):
         """Return a Pool object with the given pool name."""
-        return Pool(pool=pool, server=self.server)
+        return Pool(name=pool, root=self.root)
 
     def new_pool(self):
         """Request a new pool from the server."""
-        r = requests.get('{}/newPool'.format(self.server))
+        r = requests.get('{}/newPool'.format(self.root))
         if r.status_code != 200:
             raise RuntimeError('error getting new pool')
         pool = r.url.split('/')[-2]
@@ -40,10 +40,11 @@ class Server:
 
 
 class Pool:
+    """A ToPoS token pool."""
 
-    def __init__(self, pool, server=DEFAULT_SERVER):
-        self.server = server
-        self.pool = pool
+    def __init__(self, name, root=DEFAULT_ROOT):
+        self.root = root
+        self.name = name
         self.timeout = 0
         self.autorefresh = False
         self.refresher = None
@@ -58,7 +59,7 @@ class Pool:
             params['timeout'] = self.timeout
             params['description'] = socket.gethostname()
         r = requests.get('{}/pools/{}/nextToken'
-            .format(self.server, self.pool), params=params)
+            .format(self.root, self.name), params=params)
         if r.status_code == 404:
             raise StopIteration
         orig_headers = r.history[0].headers
@@ -79,7 +80,7 @@ class Pool:
         if 'lock' in token and self.autorefresh:
             self.refresher.remove(token['lock'])
         r = requests.delete('{}/pools/{}/tokens/{}'
-            .format(self.server, self.pool, token['id']))
+            .format(self.root, self.name, token['id']))
         if r.status_code == 404:
             raise KeyError
 
