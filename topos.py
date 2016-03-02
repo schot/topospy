@@ -65,7 +65,7 @@ class Pool:
         orig_headers = r.history[0].headers
         token = {}
         token['id'] = r.url.split('/')[-1]
-        token['data'] = r.text
+        token['value'] = r.text
         if self.timeout > 0:
             token['lock'] = orig_headers['x-topos-lockurl']
         if 'lock' in token and self.autorefresh:

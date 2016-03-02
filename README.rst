@@ -18,9 +18,9 @@ Process all available tokens in a pool:
 Tokens are provided as a Python dictionary with the following fields::
 
   {
-    'id':   '...',
-    'data': '...',
-    'lock': '...',
+    'id':    '...',
+    'value': '...',
+    'lock':  '...',
   }
 
 Token locking (for exclusive tokens) and lock refreshing are handled
